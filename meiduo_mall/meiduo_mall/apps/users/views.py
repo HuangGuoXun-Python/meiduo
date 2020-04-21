@@ -1,5 +1,7 @@
 import re
 
+from django.contrib.auth import authenticate
+from django_redis import get_redis_connection
 from django import http
 from django.contrib.auth.views import login
 from django.shortcuts import render, redirect
@@ -51,6 +53,19 @@ class RegisterView(View):
 
         #短信验证码
 
+        #1.读取redis中的短信验证码
+        redis_cli=get_redis_connection('sms_code')
+        sms_code_redis=redis_cli.get(mobile)
+        #2.判断是否过期
+        if sms_code_redis is None:
+            return http.HttpResponseForbidden('短信验证码已过期')
+        #3.删除短信验证码,不可以使用第二次
+        redis_cli.delete(mobile)
+        redis_cli.delete(mobile+'_flag')
+        #4.判断是否正确
+        if sms_code_redis.decode()!=sms_code:
+            return http.HttpResponseForbidden('短信验证码错误')
+
         #allow不需要单独验证,因为第一个验证如果通过说明allow已经打钩
 
         #处理
@@ -93,3 +108,25 @@ class MobileCountView(View):
             'code':RETCODE.OK,
             'errmsg':"OK"
         })
+
+
+#登入
+class LoginView(View):
+    def get(self,request):
+        return render(request,'login.html')
+
+    def post(self,request):
+        #接受
+        username=request.POST.get('username')
+        pwd=request.POST.get('pwd')
+
+        #验证:根据用户名查询,找到对象后在对比密码
+
+        user=authenticate(request,username=username,password=pwd)
+        if user is None:
+            #用户名或者密码错误
+            return http.HttpResponseForbidden('用户名或者密码错误')
+        else:
+            #用户名和密码正确
+            login(request,user)
+            return redirect('/')
