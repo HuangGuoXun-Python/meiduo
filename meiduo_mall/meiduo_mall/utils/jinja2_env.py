@@ -13,5 +13,5 @@ def jinja2_environment(**options):
 
 
 """
-确保可以使用Django模板引擎中的{% url('') %} {% static('') %}这类的语句 
+确保可以使用Django模板引擎中的{% url('') %} {% static('') %}这类的语句
 """
