@@ -52,7 +52,7 @@ class SmsCodeView(View):
             return http.JsonResponse({'code':RETCODE.IMAGECODEERR,'errmsg':'图形验证码已过期,请点击图片刷新'})
         #2.3立即删除redis中的图片,表示这个值不能使用第二次
         redis_cli_image.delete(uuid)
-        #2.4对比图形验证码:不区分大小写,注意redis的数据是二进制的,对比的时候需要转换
+        #2.4对比图形验证码:不区分大小写,注意redis的数据是bytes的,对比的时候需要转换
         if image_code_redis.decode().lower()!=image_code.lower():
             return http.JsonResponse({'code':RETCODE.IMAGECODEERR,'errmsg':'图形验证码错误'})
 

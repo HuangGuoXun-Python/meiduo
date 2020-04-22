@@ -1,11 +1,11 @@
 import re
-
+from . import constants
 from django.contrib.auth import authenticate
 from django_redis import get_redis_connection
 from django import http
-from django.contrib.auth.views import login
+from django.contrib.auth import login,logout
 from django.shortcuts import render, redirect
-
+from meiduo_mall.utils.login import LoginRequiredMixin
 # Create your views here.
 
 from django.views import View
@@ -119,7 +119,7 @@ class LoginView(View):
         #接受
         username=request.POST.get('username')
         pwd=request.POST.get('pwd')
-
+        next_url = request.GET.get('next', '/')
         #验证:根据用户名查询,找到对象后在对比密码
 
         user=authenticate(request,username=username,password=pwd)
@@ -129,4 +129,25 @@ class LoginView(View):
         else:
             #用户名和密码正确
             login(request,user)
-            return redirect('/')
+            #向cookie中写用户名用于客户端显示
+            response=redirect(next_url)
+            response.set_cookie('username',username,max_age=constants.USERNAME_COOKIE_EXPIRES)
+
+            return response
+#退出
+class LogoutView(View):
+    def get(self,request):
+        #删除状态保持
+        logout(request)
+
+        #删除cookie中的username,退出后转到login页面
+        response=redirect('/login/')
+        response.delete_cookie('username')
+
+        return response
+
+#用户中心,判断是否登入
+class UserCenterInfoView(LoginRequiredMixin,View):
+    def get(self,request):
+
+        return render(request,'user_center_info.html')
