@@ -1,4 +1,9 @@
+import json
 import re
+from celery_tasks.email_active.tasks import send_active_mail
+from django.conf import settings
+
+from meiduo_mall.utils import meiduo_signature
 from . import constants
 from django.contrib.auth import authenticate
 from django_redis import get_redis_connection
@@ -151,3 +156,63 @@ class UserCenterInfoView(LoginRequiredMixin,View):
     def get(self,request):
 
         return render(request,'user_center_info.html')
+
+#设置数据库邮箱发邮件
+class EmailView(LoginRequiredMixin, View):
+    def put(self, request):
+        # 接收
+        json_dict = json.loads(request.body.decode())
+        email = json_dict.get('email')
+
+        # 验证
+        if not all([email]):
+            return http.JsonResponse({'code': RETCODE.EMAILERR, 'errmsg': "邮箱无效"})
+        if not re.match(r'^[a-z0-9][\w\.\-]*@[a-z0-9\-]+(\.[a-z]{2,5}){1,2}$', email):
+            return http.JsonResponse({'code': RETCODE.EMAILERR, 'errmsg': "邮箱格式错误"})
+
+        # 处理：修改当前登录用户的邮箱属性
+        user = request.user
+        user.email = email
+        user.save()
+
+        # 发邮件：耗时代码，使用celery异步
+        # send_mail('美多商城-邮箱激活','',settings.EMAIL_FROM,[email],html_message='')
+        # 将用户编号加密
+        token = meiduo_signature.dumps({'user_id': user.id}, constants.EMAIL_ACTIVE_EXPIRES)
+        # 拼接激活的链接地址
+        verify_url = settings.EMAIL_VERIFY_URL + '?token=' + token
+        # 异步发邮件
+        send_active_mail.delay(email, verify_url)
+
+        # 响应
+        return http.JsonResponse({'code': RETCODE.OK, 'errmsg': "OK"})
+
+
+class EmailActiveView(View):
+    def get(self, request):
+        # 接收
+        token = request.GET.get('token')
+
+        # 验证
+        if not all([token]):
+            return http.HttpResponseForbidden('参数无效')
+        # 解密，获取用户编号
+        json_dict = meiduo_signature.loads(token, constants.EMAIL_ACTIVE_EXPIRES)
+        if json_dict is None:
+            return http.HttpResponseForbidden('激活信息无效')
+        user_id = json_dict.get('user_id')
+
+        # 处理
+        try:
+            user = User.objects.get(pk=user_id)
+        except:
+            return http.HttpResponseForbidden('用户无效')
+        user.email_active = True
+        user.save()
+
+        # 响应
+        return redirect('/info/')
+
+class AddressView(LoginRequiredMixin, View):
+    def get(self, request):
+        return render(request, 'user_center_site.html')
