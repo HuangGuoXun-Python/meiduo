@@ -43,7 +43,8 @@ INSTALLED_APPS = [
     'verifycations.apps.VerifycationsConfig',
     'contents.apps.ContentsConfig',
     'oauth.apps.OauthConfig',
-    'areas.apps.AreasConfig'
+    'areas.apps.AreasConfig',
+    'goods.apps.GoodsConfig',
 ]
 
 MIDDLEWARE = [
